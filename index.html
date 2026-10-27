@@ -226,7 +226,7 @@ table.rst tr.total td{font-weight:800; background:var(--blue-l)}
         试卷满分 <b>100 分</b>，及格线 <b>80 分</b>，考试时长 <b>120 分钟</b>。<br>
         单选题 <b>50 题 × 1 分</b>，多选题 <b>25 题 × 2 分</b>（全对才得分，错选/漏选不得分）。<br>
         模拟考试按上述模块比例随机抽题组卷，交卷后可逐题查看解析。刷新或关闭页面，考试进度自动保留。<br>
-        「解析」为 AI 生成的参考内容（非官方教材），仅在背题模式与答错后显示，仅辅助理解。
+        「解析」为 AI 生成的参考内容（非官方教材），答题后（不论对错）与背题模式均会显示，仅辅助理解。
       </div>
     </div>
   </section>
@@ -615,12 +615,11 @@ function renderQuestion() {
   h += optHtml(q, "practice", P.sel, P.revealed || reveal, !P.revealed && !reveal);
   if (P.revealed || reveal) {
     const ok = P.ok;
-    const showExp = (reveal && !P.revealed) || ok === false;   /* 解析仅背题模式/答错后显示 */
     h += `<div class="feedback show ${ok === false ? "fb-bad" : "fb-ok"}">` +
       (reveal && !P.revealed
         ? `正确答案：${q.ans.join("")}${q.type === "multi" ? "（多选题）" : ""}`
         : (ok ? "✓ 回答正确" : "✗ 回答错误") + ` · 正确答案：${q.ans.join("")}`) +
-      (showExp && q.exp ? `<div class="fb-exp">💡 解析：${esc(q.exp)}</div>` : "") +
+      (q.exp ? `<div class="fb-exp">💡 解析：${esc(q.exp)}</div>` : "") +
       `</div>`;
   }
   h += `<div class="ctrlrow">
@@ -940,7 +939,7 @@ function renderReview() {
       ${optHtml(q, "review", d.sel, true, false)}
       <div class="feedback show ${d.ok ? "fb-ok" : "fb-bad"}" style="margin-top:10px">
         ${d.ok ? "✓ 回答正确" : "✗ 回答错误"} · 你的答案：<b>${d.sel.length ? d.sel.join("") : "未作答"}</b> · 正确答案：<b>${q.ans.join("")}</b>
-        ${q.exp && !d.ok ? `<div class="fb-exp">💡 解析：${esc(q.exp)}</div>` : ""}
+        ${q.exp ? `<div class="fb-exp">💡 解析：${esc(q.exp)}</div>` : ""}
       </div></div>`;
   });
   if (!h) h = '<div class="card"><div class="empty">全部答对，没有错题 🎉</div></div>';
