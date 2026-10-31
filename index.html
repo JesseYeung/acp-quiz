@@ -221,6 +221,18 @@ table.rst tr.total td{font-weight:800; background:var(--blue-l)}
       <div class="bpbox" id="bpbox"></div>
     </div>
     <div class="card">
+      <h3>进度管理</h3>
+      <div style="font-size:.86rem; color:#475569; line-height:1.9">
+        刷题进度保存在<b>本浏览器</b>中，清理浏览器数据或更换设备会丢失。<br>
+        「导出进度」生成进度文件（JSON）；「导入进度」可在其他设备/浏览器恢复作答记录、错题本与考试记录。
+      </div>
+      <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
+        <button class="btn" onclick="exportProgress()">💾 导出进度</button>
+        <button class="btn ghost" onclick="$('#imp-file').click()">📂 导入进度</button>
+        <input type="file" id="imp-file" accept="application/json,.json" style="display:none" onchange="impPick(this)">
+      </div>
+    </div>
+    <div class="card">
       <h3>考试说明</h3>
       <div style="font-size:.86rem; color:#475569; line-height:1.9">
         试卷满分 <b>100 分</b>，及格线 <b>80 分</b>，考试时长 <b>120 分钟</b>。<br>
@@ -762,6 +774,75 @@ function askResetProgress() {
       buildView(false);
       toastMsg("刷题进度已重置");
     });
+}
+
+/* ===================== 进度导出 / 导入 ===================== */
+function exportProgress() {
+  const data = snapshotAll();
+  const ans = LS.get(K_ANS, {}), wrong = LS.get(K_WRONG, []), hist = LS.get(K_HIST, []);
+  const payload = {
+    app: "acp-quiz", ver: 1,
+    exportedAt: new Date().toISOString(),
+    summary: { answered: Object.keys(ans).length, wrong: wrong.length, exams: hist.length },
+    data
+  };
+  const text = JSON.stringify(payload, null, 2);
+  const d = new Date(), p2 = n => String(n).padStart(2, "0");
+  const name = `ACP刷题进度-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}.json`;
+  try {
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toastMsg("已生成进度文件 " + name);
+  } catch (e) {
+    toastMsg("导出失败：" + e.message);
+  }
+  try {
+    navigator.clipboard.writeText(text).then(() => toastMsg("进度 JSON 已复制到剪贴板，可手动粘贴存档"), () => {});
+  } catch (e) {}
+}
+
+function impPick(inp) {
+  const f = inp.files && inp.files[0];
+  inp.value = "";
+  if (f) importProgress(f);
+}
+
+function importProgress(file) {
+  if (!file) return;
+  const fr = new FileReader();
+  fr.onerror = () => toastMsg("读取文件失败");
+  fr.onload = () => {
+    let payload;
+    try { payload = JSON.parse(fr.result); } catch (e) { toastMsg("文件不是有效的 JSON"); return; }
+    const data = payload && typeof payload === "object" && payload.data && typeof payload.data === "object"
+      ? payload.data : (payload && typeof payload === "object" ? payload : null);
+    if (!data) { toastMsg("文件格式不正确"); return; }
+    const okKeys = [];
+    for (const k of Object.keys(data)) {
+      if (k.indexOf("acp_") !== 0) continue;
+      let raw = typeof data[k] === "string" ? data[k] : JSON.stringify(data[k]);
+      try { JSON.parse(raw); okKeys.push([k, raw]); } catch (e) {}
+    }
+    if (!okKeys.length) { toastMsg("文件中没有可导入的进度数据"); return; }
+    const when = payload && payload.exportedAt ? payload.exportedAt.replace("T", " ").slice(0, 16) : "未知时间";
+    const sum = payload && payload.summary
+      ? `（已答 ${payload.summary.answered || 0} 题 · 错题本 ${payload.summary.wrong || 0} 题 · 考试记录 ${payload.summary.exams || 0} 次）` : "";
+    showModal("导入刷题进度",
+      `进度文件导出于 <b>${when}</b>${sum}。<br>导入将<b>覆盖</b>当前全部刷题进度（作答记录、错题本、刷题位置、考试记录），确定继续吗？`,
+      () => {
+        for (const [k, raw] of okKeys) { LSMEM[k] = raw; lsRawSet(k, raw); }
+        hostSync(true);
+        hideModal();
+        buildView(false);
+        go("home");
+        toastMsg("进度导入成功");
+      });
+  };
+  fr.readAsText(file);
 }
 
 /* ===================== 模拟考试 ===================== */
